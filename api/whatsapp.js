@@ -33,10 +33,21 @@ export async function POST(request) {
 }
 
 async function handle(body) {
+  const statuses = body.entry?.[0]?.changes?.[0]?.value?.statuses;
+  if (statuses) return; // עדכוני נמסר/נקרא — אין מה לעשות
+  console.log('Incoming message webhook');
   for (const entry of body.entry ?? []) {
     for (const change of entry.changes ?? []) {
       for (const msg of change.value?.messages ?? []) {
-        if (digits(msg.from) !== digits(process.env.OWNER_NUMBER)) continue; // רק אתה
+        if (digits(msg.from) !== digits(process.env.OWNER_NUMBER)) {
+          console.warn('Ignored message: sender is not OWNER_NUMBER', {
+            fromEndsWith: digits(msg.from).slice(-4),
+            ownerSet: Boolean(process.env.OWNER_NUMBER),
+            ownerEndsWith: digits(process.env.OWNER_NUMBER).slice(-4),
+            ownerLength: digits(process.env.OWNER_NUMBER).length, // צריך להיות 12
+          });
+          continue;
+        }
         if (!(await markSeen(msg.id))) continue; // Meta לפעמים שולחת פעמיים
         await setLastInbound();
         markRead(msg.id).catch(() => {});
