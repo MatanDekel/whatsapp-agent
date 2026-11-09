@@ -16,7 +16,15 @@ export function GET(request) {
 
 export async function POST(request) {
   const raw = await request.text();
-  if (!validSignature(raw, request.headers.get('x-hub-signature-256'))) {
+  const sig = request.headers.get('x-hub-signature-256');
+  if (!validSignature(raw, sig)) {
+    const secret = (process.env.WA_APP_SECRET || '').trim();
+    console.warn('Signature check failed', {
+      hasHeader: Boolean(sig),
+      secretSet: Boolean(secret),
+      secretLength: secret.length, // App Secret תקין הוא באורך 32
+      secretHasSpaces: secret !== (process.env.WA_APP_SECRET || ''),
+    });
     return new Response('bad signature', { status: 401 });
   }
   // עונים ל-Meta מיד, ומעבדים ברקע
