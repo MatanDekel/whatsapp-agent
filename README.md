@@ -78,6 +78,17 @@ Automation → Personal → למשל **When WhatsApp is closed** או כמה ש�
 - לפני כל אירוע ביומן נשלחת תזכורת אוטומטית (`EVENT_REMINDER_MINUTES`, ברירת מחדל 30). אם אירוע זז או נמחק, התזכורת הישנה לא נשלחת.
 - תזכורות שרחוקות יותר משבוע נשמרות ומתוזמנות לבד על ידי ה-cron היומי.
 
+## כמה משתמשים ומשפחה
+כל משתמש מוגדר במשתנה `USERS` ב-Vercel, וכל אחד מקבל סוכן נפרד לגמרי: זיכרון, פתקים, משימות, תזכורות, יומן וסיכום בוקר משלו.
+
+```
+USERS=[{"id":"me","name":"עדן","phone":"9725XXXXXXXX","token":"<טוקן אקראי>","gender":"f","family":"home","shareSchedule":true},{"id":"partner","name":"...","phone":"9725YYYYYYYY","token":"<טוקן אקראי אחר>","gender":"m","family":"home","shareSchedule":true}]
+```
+
+- `token`: כל משתמש משתמש ב-token **שלו** ב-Header של ה-Shortcuts באייפון שלו.
+- `family` + `shareSchedule`: משתמשים עם אותו `family` יכולים לשאול "מה יש ל-X היום?", אבל רק אם X הגדיר `shareSchedule: true`. פתקים, משימות ושיחות אף פעם לא משותפים.
+- עם מספר בדיקה של Meta, צריך להוסיף כל משתמש לרשימת ה-Recipients ב-API Setup.
+
 ## פקודות
 - `/reset` בוואטסאפ: מוחק את היסטוריית השיחה (פתקים ומשימות נשמרים).
 

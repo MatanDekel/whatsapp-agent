@@ -1,13 +1,13 @@
 import { saveCalendar, scheduleEventReminders } from '../lib/reminders.js';
+import { userFromRequest } from '../lib/users.js';
 
-// ה-Shortcut באייפון שולח לכאן את האירועים של השבוע הקרוב
-// POST {"events":[{"title","start","end","location","allDay"}]}  (start/end ב-ISO 8601)
+// סנכרון היומן מהאייפון של כל משתמש (לפי ה-token שלו)
+// POST {"events":[{"title","start","end","location","allDay"}]}
 export async function POST(request) {
-  if (request.headers.get('authorization') !== `Bearer ${process.env.SHORTCUT_TOKEN}`) {
-    return new Response('unauthorized', { status: 401 });
-  }
+  const user = userFromRequest(request);
+  if (!user) return new Response('unauthorized', { status: 401 });
   const body = await request.json().catch(() => ({}));
-  const events = await saveCalendar(body.events);
-  const scheduled = await scheduleEventReminders(events);
-  return Response.json({ saved: events.length, scheduled });
+  const events = await saveCalendar(user.id, body.events);
+  const scheduled = await scheduleEventReminders(user.id, events);
+  return Response.json({ user: user.name, saved: events.length, scheduled });
 }

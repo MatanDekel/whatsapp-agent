@@ -1,5 +1,6 @@
 import { eventStillExists, formatLocal, takeReminder, verifyQStash } from '../lib/reminders.js';
-import { notifyOwner } from '../lib/whatsapp.js';
+import { userById } from '../lib/users.js';
+import { notifyUser } from '../lib/whatsapp.js';
 
 // QStash קורא לכאן בזמן התזכורת
 export async function POST(request) {
@@ -8,17 +9,19 @@ export async function POST(request) {
     return new Response('bad signature', { status: 401 });
   }
   const job = JSON.parse(raw);
+  const user = userById(job.uid);
+  if (!user) return Response.json({ skipped: 'unknown user' });
 
   if (job.kind === 'manual') {
-    const r = await takeReminder(job.id);
+    const r = await takeReminder(user.id, job.id);
     if (!r) return Response.json({ skipped: 'cancelled' });
-    await notifyOwner(`⏰ תזכורת: ${r.text}`);
+    await notifyUser(user, `⏰ תזכורת: ${r.text}`);
   }
 
   if (job.kind === 'event') {
-    if (!(await eventStillExists(job.title, job.start))) return Response.json({ skipped: 'event changed' });
+    if (!(await eventStillExists(user.id, job.title, job.start))) return Response.json({ skipped: 'event changed' });
     const where = job.location ? ` (${job.location})` : '';
-    await notifyOwner(`📅 בעוד ${job.lead} דק׳: ${job.title}${where}, ${formatLocal(job.start)}`);
+    await notifyUser(user, `📅 בעוד ${job.lead} דק׳: ${job.title}${where}, ${formatLocal(job.start)}`);
   }
 
   return Response.json({ sent: true });

@@ -1,9 +1,8 @@
 import { waitUntil } from '@vercel/functions';
 import { runAgent } from '../lib/agent.js';
 import { clearHistory, markSeen, setLastInbound } from '../lib/store.js';
+import { userByPhone } from '../lib/users.js';
 import { markRead, sendText, validSignature } from '../lib/whatsapp.js';
-
-const digits = (s) => String(s || '').replace(/\D/g, '');
 
 // אימות webhook מול Meta
 export function GET(request) {
@@ -19,37 +18,24 @@ export async function POST(request) {
   const sig = request.headers.get('x-hub-signature-256');
   if (!validSignature(raw, sig)) {
     const secret = (process.env.WA_APP_SECRET || '').trim();
-    console.warn('Signature check failed', {
-      hasHeader: Boolean(sig),
-      secretSet: Boolean(secret),
-      secretLength: secret.length, // App Secret תקין הוא באורך 32
-      secretHasSpaces: secret !== (process.env.WA_APP_SECRET || ''),
-    });
+    console.warn('Signature check failed', { hasHeader: Boolean(sig), secretSet: Boolean(secret), secretLength: secret.length });
     return new Response('bad signature', { status: 401 });
   }
-  // עונים ל-Meta מיד, ומעבדים ברקע
   waitUntil(handle(JSON.parse(raw)).catch((e) => console.error('handle failed', e)));
   return new Response('ok');
 }
 
 async function handle(body) {
-  const statuses = body.entry?.[0]?.changes?.[0]?.value?.statuses;
-  if (statuses) return; // עדכוני נמסר/נקרא — אין מה לעשות
-  console.log('Incoming message webhook');
   for (const entry of body.entry ?? []) {
     for (const change of entry.changes ?? []) {
       for (const msg of change.value?.messages ?? []) {
-        if (digits(msg.from) !== digits(process.env.OWNER_NUMBER)) {
-          console.warn('Ignored message: sender is not OWNER_NUMBER', {
-            fromEndsWith: digits(msg.from).slice(-4),
-            ownerSet: Boolean(process.env.OWNER_NUMBER),
-            ownerEndsWith: digits(process.env.OWNER_NUMBER).slice(-4),
-            ownerLength: digits(process.env.OWNER_NUMBER).length, // צריך להיות 12
-          });
+        const user = userByPhone(msg.from);
+        if (!user) {
+          console.warn('Ignored message from unknown number ending', String(msg.from).slice(-4));
           continue;
         }
-        if (!(await markSeen(msg.id))) continue; // Meta לפעמים שולחת פעמיים
-        await setLastInbound();
+        if (!(await markSeen(msg.id))) continue;
+        await setLastInbound(user.id);
         markRead(msg.id).catch(() => {});
 
         if (msg.type !== 'text') {
@@ -58,11 +44,11 @@ async function handle(body) {
         }
         const text = msg.text.body.trim();
         if (text === '/reset') {
-          await clearHistory();
+          await clearHistory(user.id);
           await sendText(msg.from, 'ההיסטוריה נמחקה ✅');
           continue;
         }
-        const { reply } = await runAgent({ channel: 'whatsapp', text });
+        const { reply } = await runAgent({ user, channel: 'whatsapp', text });
         await sendText(msg.from, reply);
       }
     }
