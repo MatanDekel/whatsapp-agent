@@ -1,5 +1,6 @@
 import { runAgent } from '../../lib/agent.js';
 import { promoteDistantReminders } from '../../lib/reminders.js';
+import { syncIfStale } from '../../lib/google.js';
 import { getUsers, sharingFamily } from '../../lib/users.js';
 import { notifyUser } from '../../lib/whatsapp.js';
 
@@ -12,6 +13,7 @@ export async function GET(request) {
   for (const user of getUsers()) {
     try {
       await promoteDistantReminders(user.id);
+      await syncIfStale(user.id, 0);
       const familyLine = sharingFamily(user).length
         ? ' בסוף, שורה קצרה על מה שיש היום לבני המשפחה שמשתפים לו"ז (get_family_schedule), רק אם יש משהו.'
         : '';
